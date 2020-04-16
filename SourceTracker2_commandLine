@@ -1,0 +1,69 @@
+
+## installation and instructions followed as here:
+
+# https://github.com/biota/sourcetracker2
+
+# where the command used was the same as last example listed in Usage Example of above page
+
+# exact command (where my input file called 'WP3ALL.biom.txt' and folder for output data called 'DNAout'
+sourcetracker2 -i WP3ALL.biom.txt -m map.txt -o DNAout/ --jobs 25 --per_sink_feature_assignments
+
+# this created a folder within 'DNAout' called 'FeatureTables' which contains one text file per sample
+# analysed (ie per sink sample identified in metadata file)
+
+# here is a script for combining all these text files into one df in R
+# and using the file name (ie sample name) as a way to label them
+
+## ==== combining the Feature tables output from SourceTracker2 ===
+
+# identify my files
+myFiles = list.files(path="~/Google Drive/Personal/WP3 paper workings/sourcetracker2-master/DNAout/FeatureTables/", pattern="*.txt")
+
+# use lapply to read them each in using read.table()
+data <- lapply(myFiles, read.table, sep="\t", header=TRUE)
+# specify the sample names from the files names where I want to get out
+# everything before the end part of the file name which is '.feature_table.txt'
+names(data) <- gsub("\\.feature_table.txt$", "", myFiles)
+
+# now use do.call with rbind to put them all together
+# and the names defined in line 16 will become the rownames
+combined.data <- do.call(rbind, data)
+# can use the row names to create a variable called 'sample' which says which text file
+# each row of data came from and therefore in my case which sample it came from
+combined.data$Sample <- row.names(combined.data)
+# im gonna reorder it to put this column at beginning of df as by default its at end
+combined.data = combined.data[,c(1707,1:1706)]
+# last thing, coz R wanted to make unique row names during rbind it appended .1 .2 and .3
+# to my row names as there are three rows per sample
+# I'll now remove -2 characters from all entires of this variable
+combined.data$Sample = substr(combined.data$Sample,1,nchar(combined.data$Sample)-2)
+# and just for niceness - rename second column as 'source' for grouping later
+colnames(combined.data)[2] <- "Source"
+
+# write it out
+write.csv(combined.data, 'DNAfeatureTablesCombined.csv', row.names=F)
+
+## can also use dplyr to do a total over all files, of proportions from each sink
+
+library(dplyr)
+# first sample names (var 1) as gonna group by source and do col sums
+# on each OTU/ column
+combined.data.slim = combined.data[,-1]
+# now use dplyr to group by source and then do colsums
+summy = combined.data.slim %>%
+  group_by(Source) %>%
+  summarise_all(funs(sum))
+
+# easier to see transposed
+rownames(summy)<-summy$Source
+summyt = t(summy)
+colnames(summyt) <- summyt[1,]
+summyt = summyt[-1,]
+
+# write this out too
+write.csv(summyt, "OTUcountsPerSource-DNA.csv", row.names=F)
+
+# this can probably be used to get an idea of which source certain OTUs came from
+# for example my two sinks were very different so I used R to find OTUs which were 
+# 0 in one sink and > x (eg 100) in the other. 
+
