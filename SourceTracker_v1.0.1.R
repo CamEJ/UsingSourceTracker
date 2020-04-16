@@ -1,3 +1,15 @@
+
+## == get work space raad ===
+setwd("~/Google Drive/Personal/WP3 paper workings/sourcetracker-1.0.1")
+source('/Users/cam/Google Drive/Data & reports/R/setFactorOrder.R')
+require(dplyr)
+library(stringr)
+library(ggplot2) 
+library(reshape2)
+
+
+
+
 # Running SourceTracker version 1.0.1
 # https://github.com/danknights/sourcetracker
 # Download tar.gz and then extract this and set folder as wkdir
@@ -5,7 +17,6 @@
 # correctly using their example data. 
 
 # ================== getting data ready ====================================# 
-
 # you will need 1) a metadatafile and 2) an OTU table
 
 # 1. metadata file formate
@@ -35,12 +46,12 @@
 # The script below expects that initially your samples will be columns and 
 # OTUs will be rows (& they will therefore be transformed). 
 # your OTU table should not include any taxo information. 
-
+# use biom table from Mothur's make.biom() command 
 
 # ====================== loading data & running scrips ================================
 
 # load sample metadata
-metadata <- read.table('metadata2slurry.txt',sep='\t',h=T,row.names=1)
+metadata <- read.table('cDNA_metadata_forSTracker2019.txt',sep='\t',h=T,row.names=1)
 
 # load OTU table
 # This 'read.table' command is designed for a 
@@ -48,12 +59,13 @@ metadata <- read.table('metadata2slurry.txt',sep='\t',h=T,row.names=1)
 # namely, the first line begins with a '#' sign
 # and actually _is_ a comment; the second line
 # begins with a '#' sign but is actually the header
-otus <- read.table('OTUtable_2slurry.txt',sep='\t', header=T,row.names=1,check=F,skip=1,comment='')
+otus <- read.table('cDNA_forSTracker2019.txt',sep='\t', header=T,row.names=1,check=F,comment='')
 head(otus)
 dim(otus)
-otus2 = otus[,c(1:8,15:90)] # removing extra T0 samples & taxo info as non in eg data
-head(otus2) # check
-otus <- t(as.matrix(otus2))
+head(otus) # check
+otus <- t(as.matrix(otus)) # transform. 
+
+## === next section as it appears in original sourcetracker.R file
 
 # extract only those samples in common between the two tables
 common.sample.ids <- intersect(rownames(metadata), rownames(otus))
@@ -72,7 +84,6 @@ train.ix <- which(metadata$SourceSink=='source')
 test.ix <- which(metadata$SourceSink=='sink')
 envs <- metadata$Env
 if(is.element('Description',colnames(metadata))) desc <- metadata$Description
-
 
 # load SourceTracker package
 source('src/SourceTracker.r')
@@ -97,8 +108,12 @@ results <- predict(st,otus[test.ix,], alpha1=alpha1, alpha2=alpha2)
 # Estimate leave-one-out source proportions in training data 
 results.train <- predict(st, alpha1=alpha1, alpha2=alpha2)
 
-# plot results
+
+### plot results =====
+
 labels <- sprintf('%s %s', envs,desc)
+labels <- sprintf('%s %s', envs,Treatment)
+
 plot(results, labels[test.ix], type='pie')
 
 # other plotting functions
@@ -108,13 +123,9 @@ plot(results, labels[test.ix], type='dist')
 # plot(results.train, labels[train.ix], type='bar')
 # plot(results.train, labels[train.ix], type='dist')
 
-# plot results with legend
-plot(results, labels[test.ix], type='pie', include.legend=TRUE, env.colors=c('#47697E','#5B7444','#CC6666','#79BEDB','#885588'))
+# =================== reading data out to plot more clearly======================
 
-# ===================reading data out to plot more clearly======================
+ProportionsOut = as.data.frame(results$proportions)
 
-xx <- lapply(results, unlist)
-max <- max(sapply(xx, length))
-job = do.call(rbind, lapply(xx, function(z)c(z, rep(NA, max-length(z)))))
+# now write out / plot 'ProportionsOut' 
 
-jobbie = as.data.frame(job)
